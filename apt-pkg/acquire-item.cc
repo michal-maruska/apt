@@ -2899,6 +2899,7 @@ pkgAcqIndexDiffs::pkgAcqIndexDiffs(pkgAcquire *const Owner,
       QueueNextDiff();
    }
 }
+
 									/*}}}*/
 void pkgAcqIndexDiffs::Failed(string const &Message,pkgAcquire::MethodConfig const * const Cnf)/*{{{*/
 {
@@ -2953,6 +2954,7 @@ void pkgAcqIndexDiffs::Finish(bool allDone)
    Dequeue();
    return;
 }
+
 									/*}}}*/
 bool pkgAcqIndexDiffs::QueueNextDiff()					/*{{{*/
 {
