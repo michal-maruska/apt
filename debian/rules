@@ -25,7 +25,8 @@ ifneq ($(filter nocheck,$(DEB_BUILD_OPTIONS)),)
 endif
 
 %:
-	dh $@ --buildsystem=cmake+ninja
+	dh $@
+#--buildsystem=cmake+ninja
 
 override_dh_clean:
 	cp COPYING debian/copyright
