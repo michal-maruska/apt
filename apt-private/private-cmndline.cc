@@ -453,6 +453,7 @@ constexpr std::initializer_list<binary> binaries{
 	 {0, "only-source", "APT::Get::Only-Source", "Only query source package names", 0},
 	 {0, "allow-unauthenticated", "APT::Get::AllowUnauthenticated", "Allow unauthenticated packages", 0},
 	 {0, "install-recommends", "APT::Install-Recommends", "Install recommended packages", CommandLine::Boolean},
+	 {0, "protect-maruska","APT::Install::Protect-Maruska","Fail if maruska package replaced", CommandLine::Boolean},
 	 {0, "install-suggests", "APT::Install-Suggests", "Install suggested packages", CommandLine::Boolean},
 	 {0, "fix-policy", "APT::Get::Fix-Policy-Broken", "Fix broken policy dependencies", 0},
 	 {0, "with-source", "APT::Sources::With::", "Configure an ephemeral source file", CommandLine::HasArg},
