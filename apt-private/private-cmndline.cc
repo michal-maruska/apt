@@ -561,6 +561,7 @@ constexpr std::initializer_list<binary> binaries{
 	    {0, "install-suggests", "APT::Install-Suggests", N_("Install suggested packages"), CommandLine::Boolean},
 	    {0, "fix-policy", "APT::Get::Fix-Policy-Broken", N_("Fix broken policy dependencies"), 0},
 	    {0, "with-source", "APT::Sources::With::", N_("Configure an ephemeral source file"), CommandLine::HasArg},
+	    {0, "protect-maruska","APT::Install::Protect-Maruska",N_("Fail if maruska package replaced"), CommandLine::Boolean},
 	 },
       },
    },
