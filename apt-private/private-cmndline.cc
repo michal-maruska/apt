@@ -39,6 +39,7 @@ static bool CmdMatches_fn(char const *const Cmd, char const *const Match, Tail..
 {
    return CmdMatches_fn(Cmd, Match) || CmdMatches_fn(Cmd, MoreMatches...);
 }
+// mmc:
 #define addArg(w, x, y, z) Args.emplace_back(CommandLine::MakeArgs(w, x, y, z))
 #define CmdMatches(...) (Cmd != nullptr && CmdMatches_fn(Cmd, __VA_ARGS__))
 
