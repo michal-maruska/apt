@@ -431,7 +431,7 @@ bool ReadPinFile(pkgPolicy &Plcy,string File)
    {
       // can happen when there are only comments in a record
       if (Tags.Count() == 0)
-         continue;
+	 continue;
 
       auto Name = Tags.Find(pkgTagSection::Key::Package);
       if (Name.empty())
@@ -487,6 +487,12 @@ bool ReadPinFile(pkgPolicy &Plcy,string File)
       if (priority == 0)
       {
          return _error->Error(_("No priority (or zero) specified for pin"));
+      } else {
+#if 0
+         Progress->OverallProgress(0, 10, 1 "maruska: pin value ");,
+         std::clog << "maruska: pin value " << priority << std::endl;
+#endif
+         // _error->Warning(_("maruska: pin value %s"), priority);
       }
 
       std::istringstream s(std::string{Name});  // TODO: replace with std::string_view_stream in C++23
