@@ -11,6 +11,7 @@
 #include <memory>
 #include <optional>
 #include <queue>
+#include <type_traits>
 #include <vector>
 
 #include <apt-pkg/configuration.h>
@@ -201,7 +202,7 @@ class Solver
    // and std::pop_heap() rather than a priority_queue because we need to
    // be able to iterate over the queued work and see if a choice would
    // invalidate any work.
-   heap<Work> work{};
+   heap<Work> work;
 
    // \brief Backlog of solved work.
    //
@@ -209,7 +210,7 @@ class Solver
    // here to revisit it later. This is similar to what MiniSAT calls the
    // trail; one distinction is that we have both literals and our work
    // queue to be concerned about
-   std::vector<Solved> solved{};
+   std::vector<Solved> solved;
 
    // \brief Propagation queue
    std::queue<Var> propQ;
@@ -222,7 +223,7 @@ class Solver
    std::vector<depth_type> choices{};
 
    // \brief The time we called Solve()
-   time_t startTime;
+   time_t startTime{};
 
    EDSP::Request::Flags requestFlags;
    /// Various configuration options
@@ -277,7 +278,7 @@ class Solver
 
    public:
    // \brief Create a new decision level.
-   void Push(Work work);
+   void Push(Var var, Work work);
    // \brief Revert to the previous decision level.
    [[nodiscard]] bool Pop();
    // \brief Undo a single assignment / solved work item
@@ -287,6 +288,7 @@ class Solver
 
    // \brief Basic solver initializer. This cannot fail.
    Solver(pkgCache &Cache, pkgDepCache::Policy &Policy, EDSP::Request::Flags requestFlags);
+   ~Solver();
 
    // Assume that the variable is decided as specified.
    [[nodiscard]] bool Assume(Var var, bool decision, const Clause *reason = nullptr);
@@ -404,9 +406,12 @@ struct APT::Solver::Clause
    // \brief A negative clause negates the solutions, that is X->A|B you get X->!(A|B), aka X->!A&!B
    bool negative;
 
+   // Clauses merged with this clause
+   std::forward_list<Clause> merged;
+
    inline Clause(Var reason, Group group, bool optional = false, bool negative = false) : reason(reason), group(group), optional(optional), negative(negative) {}
 
-   std::string toString(pkgCache &cache, bool pretty = false) const;
+   std::string toString(pkgCache &cache, bool pretty = false, bool showMerged = true) const;
 };
 
 /**
@@ -426,15 +431,8 @@ struct APT::Solver::Work
    // \brief The depth at which the item has been added
    depth_type depth;
 
-   // This is a union because we only need to store the choice we made when adding
-   // to the choice vector, and we don't need the size of valid choices in there.
-   union
-   {
-      // The choice we took
-      Var choice;
-      // Number of valid choices
-      size_t size{0};
-   };
+   // Number of valid choices
+   size_t size{0};
 
    // \brief This item should be removed from the queue.
    bool erased{false};

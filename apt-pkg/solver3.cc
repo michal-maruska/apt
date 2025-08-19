@@ -135,7 +135,7 @@ struct APT::Solver::CompareProviders3 /*{{{*/
       if ((A->CurrentVer == 0 || B->CurrentVer == 0) && A->CurrentVer != B->CurrentVer)
 	 return A->CurrentVer != 0;
       // Prefer packages in the same group as the target; e.g. foo:i386, foo:amd64
-      if (A->Group != B->Group)
+      if (A->Group != B->Group && not Pkg.end())
       {
 	 if (A->Group == Pkg->Group && B->Group != Pkg->Group)
 	    return true;
@@ -216,6 +216,8 @@ APT::Solver::Solver(pkgCache &cache, pkgDepCache::Policy &policy, EDSP::Request:
    rootState->decision = Decision::MUST;
 }
 
+APT::Solver::~Solver() = default;
+
 // This function determines if a work item is less important than another.
 bool APT::Solver::Work::operator<(APT::Solver::Work const &b) const
 {
@@ -232,10 +234,11 @@ bool APT::Solver::Work::operator<(APT::Solver::Work const &b) const
    return false;
 }
 
-std::string APT::Solver::Clause::toString(pkgCache &cache, bool pretty) const
+std::string APT::Solver::Clause::toString(pkgCache &cache, bool pretty, bool showMerged) const
 {
    std::string out;
-   out.append(reason.toString(cache));
+   if (showMerged)
+      out.append(reason.toString(cache));
    if (dep && pretty)
    {
       out.append(" ").append(pkgCache::DepIterator(cache, dep).DepType()).append(" ");
@@ -265,6 +268,14 @@ std::string APT::Solver::Clause::toString(pkgCache &cache, bool pretty) const
       out.append(" -> ");
       for (auto var : solutions)
 	 out.append(" | ").append(var.toString(cache));
+   }
+   if (showMerged && not merged.empty())
+   {
+      for (auto &clause : merged)
+      {
+	 out.append(" and");
+	 out.append(clause.toString(cache, pretty, false));
+      }
    }
    return out;
 }
@@ -490,7 +501,9 @@ bool APT::Solver::ObsoletedByNewerSourceVersion(pkgCache::VerIterator cand) cons
    for (auto ver = cand.Cache()->FindGrp(cand.SourcePkgName()).VersionsInSource(); not ver.end(); ver = ver.NextInSource())
    {
       // We are only interested in other packages in the same source package; built for the same architecture.
-      if (ver->ParentPkg == cand->ParentPkg || ver.ParentPkg()->Arch != cand.ParentPkg()->Arch || cache.VS->CmpVersion(ver.SourceVerStr(), cand.SourceVerStr()) <= 0)
+      if (ver->ParentPkg == cand->ParentPkg || ver.ParentPkg()->Arch != cand.ParentPkg()->Arch ||
+	    (ver->MultiArch & pkgCache::Version::All) != (cand->MultiArch & pkgCache::Version::All) ||
+	     cache.VS->CmpVersion(ver.SourceVerStr(), cand.SourceVerStr()) <= 0)
 	 continue;
 
       // We also take equal priority here, given that we have a higher version
@@ -664,6 +677,61 @@ static bool SameOrGroup(pkgCache::DepIterator a, pkgCache::DepIterator b)
 const APT::Solver::Clause *APT::Solver::RegisterClause(Clause &&clause)
 {
    auto &clauses = (*this)[clause.reason].clauses;
+   pkgCache::DepIterator dep(cache, clause.dep);
+
+   // Merge dependencies on the same name into a single one, and restrict their solution space.
+   // For example, given dependencies on
+   //	 bar Depends: pkg (<< 3), pkg (>> 2)
+   //	 foo Provides: pkg (= 1)
+   // The solution must always be pkg (= 2) and not say pkg (= 3), foo.
+   // FIXME: This would be nice to merge across or groups too, but we can't do that yet.
+   if (not clause.negative && not dep.end() && not(dep->CompareOp & pkgCache::Dep::Or))
+   {
+      bool merged = false;
+      for (auto const &earlierClause : clauses)
+      {
+	 if (earlierClause->negative)
+	    continue;
+	 // Skip dependencies with or groups or dependencies on different names
+	 if (pkgCache::DepIterator earlierDep(cache, earlierClause->dep);
+	     earlierDep.end() || (earlierDep->CompareOp & pkgCache::Dep::Or) ||
+	     earlierDep.TargetPkg() != dep.TargetPkg())
+	    continue;
+	 if (std::none_of(earlierClause->solutions.begin(), earlierClause->solutions.end(), [&clause](auto earlierSol)
+			  { return std::find(clause.solutions.begin(),
+					     clause.solutions.end(),
+					     earlierSol) != clause.solutions.end(); }))
+	    continue;
+
+	 if (earlierClause->optional == clause.optional)
+	 {
+	    std::erase_if(earlierClause->solutions, [&clause, this](auto earlierSol)
+			  { return std::find(clause.solutions.begin(),
+					     clause.solutions.end(),
+					     earlierSol) == clause.solutions.end(); });
+
+	    earlierClause->merged.push_front(clause);
+	    merged = true;
+	 }
+	 else if (clause.optional)
+	 {
+	    // If say a Depends has fewer solution than a Recommends, remove the Recommend's extranous ones.
+	    std::erase_if(clause.solutions, [&earlierClause, this](auto sol)
+			  { return std::find(earlierClause->solutions.begin(),
+					     earlierClause->solutions.end(),
+					     sol) == earlierClause->solutions.end(); });
+
+	    // Remove recursion here, such that we display correctly (if we ever display anywhere...)
+	    auto earlierClauseCopy = *earlierClause;
+	    clause.merged = std::move(earlierClauseCopy.merged);
+	    clause.merged.push_front(earlierClauseCopy);
+	 }
+      }
+
+      if (merged)
+	 return nullptr;
+   }
+
    clauses.push_back(std::make_unique<Clause>(std::move(clause)));
    auto const &inserted = clauses.back();
    for (auto var : inserted->solutions)
@@ -896,18 +964,28 @@ APT::Solver::Clause APT::Solver::TranslateOrGroup(pkgCache::DepIterator start, p
 	    std::cerr << "Promoting new clause to hard dependency: " << clause.toString(cache) << std::endl;
 	 clause.optional = false;
       }
+      else if (not existing.end() && importantToKeep(start) && satisfied)
+      {
+	 if (unlikely(debug >= 3))
+	    std::cerr << "Restricting existing Recommends to installed packages: " << clause.toString(cache, true) << std::endl;
+	 // Erase the non-installed solutions. We will process this last and try to keep the previously installed
+	 // "best" solution installed.
+	 clause.solutions.erase(std::remove_if(clause.solutions.begin(), clause.solutions.end(), [this](auto var)
+					       { return var.CastPkg(cache)->CurrentVer == nullptr; }),
+				clause.solutions.end());
+      }
    }
 
    return clause;
 }
 
-void APT::Solver::Push(Work work)
+void APT::Solver::Push(Var var, Work work)
 {
    if (unlikely(debug >= 2))
       std::cerr << "Trying choice for " << work.toString(cache) << std::endl;
 
    choices.push_back(solved.size());
-   solved.push_back(Solved{Var(), std::move(work)});
+   solved.push_back(Solved{var, std::move(work)});
 }
 
 void APT::Solver::UndoOne()
@@ -947,6 +1025,8 @@ bool APT::Solver::Pop()
       return false;
 
    time_t now = time(nullptr);
+   if (startTime == 0)
+      startTime = now;
    if (now - startTime >= Timeout)
       return _error->Error("Solver timed out.");
 
@@ -956,9 +1036,16 @@ bool APT::Solver::Pop()
 
    _error->Discard();
 
+   // Assume() actually failed to enqueue anything, abort here
+   if (choices.back() == solved.size())
+   {
+      choices.pop_back();
+      return true;
+   }
+
    assert(choices.back() < solved.size());
    int itemsToUndo = solved.size() - choices.back();
-   auto choice = solved[choices.back()].work->choice;
+   auto choice = solved[choices.back()].assigned;
 
    for (; itemsToUndo; --itemsToUndo)
       UndoOne();
@@ -976,7 +1063,7 @@ bool APT::Solver::Pop()
       std::cerr << "Backtracking to choice " << choice.toString(cache) << "\n";
 
    // FIXME: There should be a reason!
-   if (not Enqueue(choice, false, {}))
+   if (not choice.empty() && not Enqueue(choice, false, {}))
       return false;
 
    if (unlikely(debug >= 2))
@@ -1059,8 +1146,7 @@ bool APT::Solver::Solve()
 	 }
 	 if (item.size > 1 || item.clause->optional)
 	 {
-	    item.choice = sol;
-	    Push(item);
+	    Push(sol, item);
 	 }
 	 if (unlikely(debug >= 3))
 	    std::cerr << "(try it: " << sol.toString(cache) << ")\n";
@@ -1090,6 +1176,7 @@ bool APT::Solver::Solve()
 bool APT::Solver::FromDepCache(pkgDepCache &depcache)
 {
    DefaultRootSetFunc2 rootSet(&cache);
+   std::vector<Var> manualPackages;
 
    // Enforce strict pinning rules by rejecting all forbidden versions.
    if (StrictPinning)
@@ -1164,8 +1251,11 @@ bool APT::Solver::FromDepCache(pkgDepCache &depcache)
 	    Clause w{Var(), Group, isOptional};
 	    w.solutions.push_back(Var(P));
 	    auto insertedW = RegisterClause(std::move(w));
-	    if (not AddWork(Work{insertedW, depth()}))
+	    if (insertedW && not AddWork(Work{insertedW, depth()}))
 	       return false;
+
+	    if (not isAuto)
+	       manualPackages.push_back(Var(P));
 
 	    // Given A->A2|A1, B->B1|B2; Bn->An, if we select `not A1`, we
 	    // should try to install A2 before trying B so we end up with
@@ -1177,7 +1267,7 @@ bool APT::Solver::FromDepCache(pkgDepCache &depcache)
 	       shortcircuit.solutions.push_back(Var(V));
 	    std::stable_sort(shortcircuit.solutions.begin(), shortcircuit.solutions.end(), CompareProviders3{cache, policy, P, *this});
 	    auto insertedShort = RegisterClause(std::move(shortcircuit));
-	    if (not AddWork(Work{insertedShort, depth()}))
+	    if (insertedShort && not AddWork(Work{insertedShort, depth()}))
 	       return false;
 
 	    // Discovery here is needed so the shortcircuit clause can actually become unit.
@@ -1196,12 +1286,23 @@ bool APT::Solver::FromDepCache(pkgDepCache &depcache)
 	 if (unlikely(debug >= 1))
 	    std::cerr << "Install essential package " << P << std::endl;
 	 auto inserted = RegisterClause(std::move(w));
-	 if (not AddWork(Work{inserted, depth()}))
+	 if (inserted && not AddWork(Work{inserted, depth()}))
 	    return false;
       }
    }
 
-   return Propagate();
+   if (not Propagate())
+      return false;
+
+   std::stable_sort(manualPackages.begin(), manualPackages.end(), CompareProviders3{cache, policy, {}, *this});
+   for (auto assumption : manualPackages)
+   {
+      if (not Assume(assumption, true, {}) || not Propagate())
+	 if (not Pop())
+	    abort();
+   }
+
+   return true;
 }
 
 bool APT::Solver::ToDepCache(pkgDepCache &depcache) const
