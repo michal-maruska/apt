@@ -1,3 +1,89 @@
+apt (3.3.1-maruska2) unstable; urgency=medium
+
+  [ Michal Maruska ]
+  * Remove trailing spaces
+  * fix spelling in comments
+  * Extend the <template...> ShowList() to use color for package names
+  * comment on the configuration dictionary -- colors
+  * Use green for installed color ... 33/01 ?, Kept, held, downgraded
+  * Report to-be-removed packages below the added ones, to increase visibility
+  * apt-policy: use Green color for the version strings
+  * apt-cache: highlight package name with Yellow
+  * comments
+  * drop ninja
+  * verbose tracing: "pkgAllUpgrade considering"
+  * color + ninja
+  * Use color when showing upgrade away from "maruska" version
+  * Effort to get the colored gcc output:
+  * add option: protect-maruska  APT::Install::Protect-Maruska
+  * Abort if any to-be-dropped package is of '*maruska*' version.
+  * trigger a warning
+  * Try hard to Trace when the pinning info is read-in.
+  * Upgrade: exit when the upgrade would remove maruska version.
+  * drop
+  * Revert ReadPinDir/ReadPinFile(, prograss) addition -- to keep ABI for aptitude
+  * ci: use my organization/infrastructure to produce the .deb
+  * ci give secrets, and rely on default apt-repo
+  * ci: build the tagged commit when triggered by sid/ tag
+  * ci: manual invocation: choose which ref to build
+  * ci: invoke with architectures parameter.
+  * my comments
+
+  [ Julian Andres Klode ]
+  * Document and test combined `build-dep --arch-only --indep-only`
+  * ftparchive: fix heap overflow in ContentsExtract::DoItem
+  * deb: guard against unsigned underflow when trimming control newlines
+  * gpgv: don't advance past the null terminator in PushEntryWithKeyID
+  * ftparchive: replace ContentsExtract's manual buffer with std::vector<char>
+  * test: Limit valgrind to 1024 open files
+  * hashes: Fix lingering OpenSSL error (Closes: #1140227)
+  * test: use `gnurm` where available
+  * apt-private: Convert apt-cache to declarative format
+  * Convert apt-cdrom option parsing to declarative handler
+  * Convert apt-dump-solver, apt-internal-planner, apt-internal-solver to declarative format
+  * Convert apt-config to declarative format
+  * Convert apt-extracttemplates to declarative format
+  * Convert apt-ftparchive to declarative format
+  * Convert apt-sortpkgs to declarative format
+  * Convert rred to declarative format
+  * Convert apt-helper to declarative format
+  * Convert apt-mark to declarative format
+  * Convert apt-get to declarative format
+  * Add inherits field to binary struct, convert APT to declarative format
+  * Define globalOptions data and collapse getCommandArgs switch
+  * Fix crash when an aux file request is redirected
+  * Reply to aux requests with the original URI if redirected
+  * test: mirrorlist fetch via redirect, fix clearing redirect::replace config
+
+  [ наб ]
+  * apt-transport-https(1): document host-specific SSLCert, SSLKey, Verify-Host with host:: instead of ::host
+
+  [ David Kalnischkies ]
+  * aptwebserver: Refuse client immediately on TLS handshake
+
+  [ Américo Monteiro ]
+  * Portuguese manpages translation update (Closes: #1133965)
+
+  [ Frans Spiesschaert ]
+  * Dutch program translation update (Closes: #1135221)
+  * Dutch manpages translation update (Closes: #1135222)
+
+  [ Remus-Gabriel Chelu ]
+  * Romanian program translation update (Closes: #1139336)
+
+  [ Mark Atwood ]
+  * hashes: include <span> for std::span
+  * hashes: don't crash on an unavailable digest
+  * test: exercise hashes with a disabled digest
+
+  [ dongshengyuan ]
+  * fix: install-deb-with-colon-in-path Fix by checking whether the name starts with a path prefix (/, ./,or ../): if so, it is a file path rather than a package name with an architecture suffix, so we skip the colon-splitting logic and look up the package under the native architecture directly. Add a regression test test-apt-get-install-deb-colon-path that installs a .deb from a directory whose name contains a colon and verifies the installation succeeds.
+
+  [ Simon Johnsson ]
+  * apt-pkg: rename "OpenPGP signature verification failed" to "Signature verification failed"
+
+ -- Michal Maruska <mmaruska@gmail.com>  Tue, 21 Jul 2026 10:31:04 +0200
+
 apt (3.3.1) unstable; urgency=medium
 
   [ Julian Andres Klode ]
