@@ -11,6 +11,13 @@ on:
         type: string
         default: 'main'
 
+      architectures:
+        type: choice
+        options:
+          - '["amd64"]'
+          - '["arm64"]'
+          - '["amd64","arm64"]'
+        default: '["amd64"]'
 
 permissions:
   contents: write
@@ -21,4 +28,5 @@ jobs:
     uses: michal-maruska/workflows/.github/workflows/build-and-publish-deb.yml@main
     with:
       ref: ${{ inputs.ref || github.ref }}
+      architectures: ${{ inputs.architectures || vars.DEFAULT_ARCHITECTURES || '["amd64","arm64"]' }}
     secrets: inherit
