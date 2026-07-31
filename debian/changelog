@@ -1,3 +1,36 @@
+apt (3.3.2-maruska) unstable; urgency=medium
+
+  * Remove trailing spaces
+  * fix spelling in comments
+  * Extend the <template...> ShowList() to use color for package names
+  * comment on the configuration dictionary -- colors
+  * Use green for installed color ... 33/01 ?, Kept, held, downgraded
+  * Report to-be-removed packages below the added ones, to increase visibility
+  * apt-policy: use Green color for the version strings
+  * apt-cache: highlight package name with Yellow
+  * comments
+  * drop ninja
+  * verbose tracing: "pkgAllUpgrade considering"
+  * color + ninja
+  * Use color when showing upgrade away from "maruska" version
+  * Effort to get the colored gcc output:
+  * add option: protect-maruska  APT::Install::Protect-Maruska
+  * Abort if any to-be-dropped package is of '*maruska*' version.
+  * trigger a warning
+  * Try hard to Trace when the pinning info is read-in.
+  * Upgrade: exit when the upgrade would remove maruska version.
+  * drop
+  * Revert ReadPinDir/ReadPinFile(, prograss) addition -- to keep ABI for aptitude
+  * ci: use my organization/infrastructure to produce the .deb
+  * ci give secrets, and rely on default apt-repo
+  * ci: build the tagged commit when triggered by sid/ tag
+  * my comments
+  * ci: manual invocation: choose which ref to build
+  * ci: invoke with architectures parameter.
+  * ci: run on unstable/* tags too
+
+ -- Michal Maruska <mmaruska@gmail.com>  Fri, 31 Jul 2026 16:09:49 +0200
+
 apt (3.3.2) unstable; urgency=medium
 
   [ Julian Andres Klode ]
